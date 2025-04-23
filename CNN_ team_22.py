@@ -1,196 +1,255 @@
+"""
+Description:
+Manually implement a   Convolutional  Neural  Network (CNN) from scratch to 
+classify handwritten digits from the MNIST dataset.
+
+(1) Forward propagation function (including a 2D convolution operation). 
+(2) Backward propagation function (including gradient calculations for convolution kernels and fully connected layer). 
+(3) Train function (for parameter updates of CNN neural network by loss). 
+(4) ReLU activation (for the 1st layer). 
+(5) Softmax activation (for the 2nd layer). 
+(6) Cross-entropy function (for calculating loss). 
+(7) Main function (for training and testing designed CNN by train dataloader and test dataloader respectively).
+
+Authors: [Abdoul Djalil Guyzmo Sawadogo, Chase Murry, Toan Le]
+Date: Apr 27, 2025
+"""
+
+# CLEAN THE CONSOLE.
+from os import system
+system('clear')
+
+
 import numpy as np
-
-# Class for CNN
-class SimpleCNN:
-    # initates the kernal size and learning rate
-    def __init__(self, kernel_size=3, learning_rate=0.01):
-        self.kernel_size = kernel_size
-        self.lr = learning_rate
-        self.init_parameters()
-
-    # sets up random starting parms
-    def init_parameters(self):
-        self.kernel = np.random.randn(self.kernel_size, self.kernel_size) * 0.01  # Conv kernel
-        self.fc_weights = np.random.randn(10, (28 - self.kernel_size + 1)**2) * 0.01  # FC weights
-        self.fc_biases = np.zeros(10)  # Bias for 10 output classes
-
-    # runs relu
-    def relu(self, x):
-        return np.maximum(0, x)
-
-    # runs softmax
-    def softmax(self, x):
-        e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
-        return e_x / np.sum(e_x, axis=1, keepdims=True)
-
-    # does cross entropy calculations
-    def cross_entropy(self, preds, labels):
-        batch_size = preds.shape[0]
-        return -np.sum(np.log(preds[range(batch_size), labels])) / batch_size
-
-    # deals with forward propagation
-    # inputs: image batch of shape (size,28,28) = x
-    # output: Output probabilities after softmax, shape is (size,10)
-    def forward(self, x):
-        # grab size
-        batch_size = x.shape[0]
-        conv_output = np.zeros((batch_size, 28 - self.kernel_size + 1, 28 - self.kernel_size + 1))
-        
-        # Convolution operation
-        for i in range(batch_size):
-            for row in range(28 - self.kernel_size + 1):
-                for col in range(28 - self.kernel_size + 1):
-                    region = x[i, row:row + self.kernel_size, col:col + self.kernel_size]
-                    conv_output[i, row, col] = np.sum(region * self.kernel)
-        
-        # ReLU activation function
-        relu_output = self.relu(conv_output)
-        
-        # Flatten the output to 1d vector
-        flattened = relu_output.reshape(batch_size, -1)
-        
-        # adjust for weights and biases
-        fc_output = np.dot(flattened, self.fc_weights.T) + self.fc_biases
-        
-        # Softmax activation function
-        probs = self.softmax(fc_output)
-
-        self.x = x  # Save input for backprop
-        self.conv_output = conv_output
-        self.relu_output = relu_output
-        self.flattened = flattened
-        self.probs = probs
-
-        
-        return probs
-
-    # Deals with back propagation
-    # input is labels = y, predictions = pred
-    # Output adjusts weights
-    def backward(self, y):
-        # get shape of labels
-        batch_size = y.shape[0]
-
-        # Gradient of cross-entropy loss with softmax output
-        dL_dfc_output = self.probs.copy()
-        dL_dfc_output[range(batch_size), y] -= 1
-        dL_dfc_output /= batch_size  # average over batch
-
-        # Gradients for fully connected layer
-        dL_dW_fc = np.dot(dL_dfc_output.T, self.flattened)  # shape: [10, flattened_dim]
-        dL_db_fc = np.sum(dL_dfc_output, axis=0)  # shape: [10]
-
-        # Gradient w.r.t. flattened input (backprop through FC)
-        dL_dflattened = np.dot(dL_dfc_output, self.fc_weights)  # shape: [batch_size, flattened_dim]
-
-        # Gradient of ReLU 
-        dL_drelu = dL_dflattened.reshape(self.relu_output.shape)
-        d_relu_dconv = self.conv_output > 0
-        dL_dconv = dL_drelu * d_relu_dconv  # element-wise multiply
-
-        # Gradient for convolution kernel
-        dL_dkernel = np.zeros_like(self.kernel)
-        for i in range(batch_size):
-            for row in range(dL_dconv.shape[1]):
-                for col in range(dL_dconv.shape[2]):
-                    region = self.x[i, row:row+self.kernel_size, col:col+self.kernel_size]
-                    dL_dkernel += dL_dconv[i, row, col] * region
-        
-        dL_dkernel /= batch_size  # average over batch
-
-        # Update parameters
-        self.fc_weights -= self.lr * dL_dW_fc
-        self.fc_biases  -= self.lr * dL_db_fc
-        self.kernel     -= self.lr * dL_dkernel
-
-    #  Deals with training the model
-    # inputs: train_loader = training data, test_loader = test info, and epoch = number of goes
-    def train(self, train_loader, test_loader, epochs=5):
-        for epoch in range(epochs):
-            total_loss = 0
-            correct = 0
-            total = 0
-
-            # go through a training cycle
-            for i, (images, labels) in enumerate(train_loader):
-                # Forward pass
-                probs = self.forward(images)
-
-                # Compute loss
-                loss = self.cross_entropy(probs, labels)
-                total_loss += loss
-
-                # Predictions & Accuracy
-                preds = np.argmax(probs, axis=1)
-                correct += np.sum(preds == labels)
-                total += labels.shape[0]
-
-                # Backward pass
-                self.backward(labels)
-
-                # Print every 50 batches
-                if (i + 1) % 50 == 0:
-                    acc = correct / total * 100
-                    print(f"Epoch [{epoch+1}/{epochs}], Step [{i+1}], "
-                        f"Loss: {loss:.4f}, Accuracy: {acc:.2f}%")
-            
-            # Epoch summary
-            train_acc = correct / total * 100
-            avg_loss = total_loss / (i + 1)
-            avg_loss = total_loss / (i + 1)
-            print(f"Epoch [{epoch+1}] completed. Avg Loss: {avg_loss:.4f}, Training Accuracy: {train_acc:.2f}%")
-
-            # Evaluate on test set
-            test_acc = self.evaluate(test_loader)
-            print(f"Test Accuracy after epoch {epoch+1}: {test_acc:.2f}%\n")
-
-
-    # a function to evalute Accuracy
-    def evaluate(self, test_loader):
-        correct = 0
-        total = 0
-        for images, labels in test_loader:
-            probs = self.forward(images)
-            preds = np.argmax(probs, axis=1)
-            correct += np.sum(preds == labels)
-            total += labels.shape[0]
-        return correct / total * 100
-
-    # Deals with testing the model
-    def test(self, test_loader):
-        acc = self.evaluate(test_loader)
-        print(f"Final Test Accuracy: {acc:.2f}%")
-
-#-----------------------------------------------------------
-# Oddly enough, this is just the data set
-import torch
-from torchvision import datasets, transforms
+import torchvision
+import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
-# Transform to tensor and normalize between 0 and 1
-transform = transforms.Compose([
-    transforms.ToTensor(),  # Converts to [0,1]
-])
+# ===================== Utility Functions ===================== #
+# ReLU activation (for the 1st layer). 
+def relu(x):
+    """ReLU activation function"""
+    return np.maximum(0, x)
 
-# Download MNIST
-train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-test_dataset  = datasets.MNIST(root='./data', train=False, transform=transform, download=True)
+# Derivative of ReLU activation functions
+def relu_derivative(x):
+    """Derivative of ReLU used in backpropagation"""
+    return (x > 0).astype(float)
 
-# Convert torch tensors to NumPy arrays in batches
-def numpy_data_loader(dataset, batch_size=64):
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    for images, labels in loader:
-        # Convert shape from [B, 1, 28, 28] -> [B, 28, 28]
-        np_images = images.squeeze(1).numpy()
-        np_labels = labels.numpy()
-        yield np_images, np_labels
+# Softmax activation (for the 2nd layer)
+def softmax(x):
+    """Softmax activation for output layer (multi-class classification)"""
+    exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+    return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
-# Create loaders for training and testing
-train_loader = numpy_data_loader(train_dataset, batch_size=64)
-test_loader  = numpy_data_loader(test_dataset, batch_size=64)
+# Cross-entropy function (for calculating loss). 
+def cross_entropy_loss(y_pred, y_true):
+    """Cross-entropy loss for classification"""
+    m = y_true.shape[0]
+    log_likelihood = -np.log(y_pred[range(m), y_true])
+    return np.sum(log_likelihood) / m
 
-#-------------------------------------------------------------------
 
-cnn = SimpleCNN(kernel_size=3, learning_rate=0.01)
-cnn.train(train_loader, test_loader, epochs=5)
-cnn.test(test_loader)
+# ===================== Data Loading ===================== #
+def dataloader(train_dataset, test_dataset, batch_size=64):
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+    return train_loader, test_loader
+
+def load_data():
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    train_dataset = torchvision.datasets.MNIST(root="./data/mnist", train=True, download=True, transform=transform)
+    test_dataset = torchvision.datasets.MNIST(root="./data/mnist", train=False, download=True, transform=transform)
+    print("Training samples:", len(train_dataset))
+    print("Testing samples:", len(test_dataset))
+    return dataloader(train_dataset, test_dataset)
+
+
+# ===================== CNN Structure ===================== #
+class CNN:
+    """
+    Represent a Convolutional Neural Network (CNN) using deep learning techniques for 
+    handwritten digits classification on MNIST dataset.
+    """
+    def __init__(self, input_size, num_filters, kernel_size, fc_output_size, lr):
+        """
+        Initialization.
+        
+        :param input_size: 
+        :param num_filters: number of convolutional filters (kernels) to apply in the convolutional layer
+        :param kernel_size: height and width of the square convolutional filters (e.g., 3 means a 3x3 filter)
+        :param fc_output_size: number of output classes for classification.
+        :param lr: learning rate used for updating weights during training via gradient descent.
+        
+        """
+        # Initialize convolution kernel with Gaussian distribution
+        self._kernel = np.random.randn(kernel_size, num_filters, kernel_size) * 0.01
+        self._num_filters = num_filters
+        self._kernel_size = kernel_size
+        
+        # Compute output size after convolution (no padding)
+        conv_output_size = input_size - kernel_size + 1
+        
+        # Flattened size after ReLU to feed into the fully connected layer
+        self._fc_input_size = conv_output_size * conv_output_size * num_filters
+        
+        # Initialize weights and biases for fully connected layer
+        self._W_fc = np.random.randn(self._fc_input_size, fc_output_size) * 0.01
+        self._b_fc = np.zeros((1, fc_output_size))
+        
+        self._lr = lr # learning rate
+        
+        self._z1 = None # Pre-activation of layer 1
+        self._a1 = None # Activation of layer 1 (ReLU)
+        self._a1_flat = None # Flatten self._a1 for Fully Connected Layer
+        self._z2 = None # Pre-activation of layer 2
+        self._a2 = None # Output probabilities (via softmax)
+    
+    # Convolution layer
+    def conv2d(self, x):
+        """Description.
+        
+        :param x: Batch of MNIST images (shape [batch_size, 28, 28]).
+        
+        return result_of_conv_layer
+        """
+        batch_size, input_height, input_width = x.shape
+        k = self._kernel_size
+        output_height = input_height - k + 1
+        output_width = input_width - k + 1
+        result_of_conv_layer = np.zeros((batch_size, self._num_filters, output_height, output_width))
+        
+        # Slide the kernel across each spatial position
+        for f in range(self._num_filters):
+            for i in range(output_height):
+                for j in range(output_width):
+                    region = x[:, i:i+k, j:j+k] # extract local patch
+                    result_of_conv_layer[:, f, i, j] = np.sum(region * self._kernel[f], axis=(1, 2))
+                
+        return result_of_conv_layer
+    
+    # Forward pass through the CNN
+    def forward(self, x):
+        """
+        Forward pass through the CNN.
+        
+        :param x: Batch of MNIST images (shape [batch_size, 28, 28]).
+        
+        return : Prediction probabilities after passing through the two layers.
+        """
+        # Layer 1
+        self._z1 = self.conv2d(x) # convolution output
+        self._a1 = relu(self._z1) # ReLU activation for layer 1
+        
+        self._a1_flat = self._a1.reshape(x.shape[0], -1) # Flatten self._a1 for Fully Connected Layer
+        
+        # Layer 2
+        self._z2 = np.dot(self._a1_flat, self._W_fc) + self._b_fc # Fully Connected Layer
+        self._a2 = softmax(self._z2) # Softmax activation → gives class probabilities
+        
+        return self._a2 # This returned value is 'pred'
+    
+    # Backward pass to compute gradients and update weights
+    def backward(self, x, y, pred):
+        """
+        Computes gradients for convolution kernels weighs and fully connected weights/biases.
+        Compute gradients averaged over the current batch (e.g., divide gradients by the batch size).
+        
+        :param x: Batch of images
+        :param y: ground-truth labels
+        :param pred: predictions from forward propagation.
+        """
+        m = y.shape[0] # Batch size
+        
+        # 1. one-hot encode the labels (Convert true labels to one-hot encoding)
+        y_onehot = np.zeros_like(pred)
+        y_onehot[np.arange(m), y] = 1
+        
+        # 2. Calculate softmax cross-entropy loss gradient (Gradient of loss w.r.t. z2 (output layer pre-activation))
+        dz2 = (pred - y_onehot) / m
+        dW_fc = np.dot(self._a1_flat.T, dz2)
+        db_fc = np.sum(dz2, axis=0, keepdims=True)
+        
+        # 3. Calculate fully connected layer gradient
+        da1_flat = np.dot(dz2, self._W_fc.T)
+        da1 = da1_flat.reshape(self._a1.shape)
+        
+        # 4. Backpropagate through ReLU
+        dz1 = da1 * relu_derivative(self._z1)
+        
+        # 5. Calculate convolution kernel gradient
+        dK = np.zeros_like(self._kernel)
+        for f in range(self._num_filters):
+            for i in range(self._kernel.shape[1]):
+                for j in range(self._kernel.shape[2]):
+                    region = x[:, i:i + dz1.shape[2], j:j + dz1.shape[3]]
+                    dK[f, i, j] = np.sum(region * dz1[:, f])
+                
+        # 6. Update parameters (Update the weights and biases using gradient descent (θ_new = θ_prev - ⍺ * ∇f))
+        self._W_fc = self._W_fc - self._lr * dW_fc
+        self._b_fc = self._b_fc - self._lr * db_fc
+        self._kernel = self._kernel - self._lr * dK
+        
+    
+    def train(self, x, y):
+        """
+        Uses batch-based training (i.e., process data in batches of size 128 as provided by the dataloader)
+        Computes forward function, uses the result(pred: predection) to compute the cross-entropy loss, 
+        then computes the backward function.
+        
+        :param x: batch of images
+        :param y: ground-truth labels
+        
+        retun loss: cross-entropy loss
+        """
+        # call forward function
+        pred = self.forward(x)
+        # calculate loss
+        loss = cross_entropy_loss(pred, y)
+        # call backward function
+        self.backward(x, y, pred)
+        
+        return loss
+
+
+# ===================== Training Process ===================== #
+def main():
+    # First, load data
+    train_loader, test_loader = load_data()
+    
+    # Second, define hyperparameters
+    input_size = 28
+    num_filters = 1
+    kernel_size = 3
+    fc_output_size = 10
+    learning_rate = 0.01
+    num_epochs = 5
+    
+    # Initialize model
+    model = CNN(input_size, num_filters, kernel_size, fc_output_size, learning_rate)
+    
+    # Then, train the model
+    for epoch in range(num_epochs):
+        total_loss = 0
+        
+        for inputs, labels in train_loader: # define training phase for training model
+            x = inputs.numpy().squeeze(1)
+            y = labels.numpy()
+            loss = model.train(x, y)
+            total_loss += loss
+
+        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss/len(train_loader):.4f}") # print the loss for each epoch
+
+    correct_pred = 0
+    total_pred = 0
+    for inputs, labels in test_loader:
+        x = inputs.numpy().squeeze(1) # Flatten and convert to NumPy
+        y = labels.numpy()
+        pred = model.forward(x) # the model refers to the model that was trained during the training phase
+        predicted_labels = np.argmax(pred, axis=1)
+        correct_pred += np.sum(predicted_labels == y)
+        total_pred += len(y)
+    print(f"Test Accuracy: {correct_pred / total_pred:.4f}")
+
+if __name__ == "__main__":
+    main()
