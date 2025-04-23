@@ -1,4 +1,3 @@
-
 """
 Description:
 Manually implement a Multi-Layer Perceptron (MLP) from scratch to 
