@@ -31,12 +31,22 @@ from torch.utils.data import DataLoader
 # ===================== Utility Functions ===================== #
 # Activation functions (hidden layers)
 def sigmoid(x):
-    """Sigmoid activation for the hidden layer"""
+    """Sigmoid activation for the hidden layer.
+    
+    :param x:
+    
+    return 1/(1 + e^x)
+    """
     return 1 / (1 + np.exp(-x))
 
-# Derivative of activation functions
+# Derivative of sigmoid activation functions
 def sigmoid_derivative(z):
-    """Derivative of sigmoid used in backpropagation"""
+    """Derivative of sigmoid used in backpropagation
+    
+    :param z:
+    
+    return p - p**2
+    """
     p = sigmoid(z)
     return p - p**2 # p - p**2 = p * (1 - p)
 
@@ -46,8 +56,9 @@ def softmax(x):
     exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))  # stability trick
     return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
-# Cross-entropy loss for classification
+# Cross-entropy function (for calculating loss). 
 def cross_entropy_loss(y_pred, y_true):
+    """Cross-entropy loss for classification"""
     m = y_true.shape[0]  # Batch size
     log_likelihood = -np.log(y_pred[range(m), y_true])  # Select log-prob of correct class
     loss = np.sum(log_likelihood) / m
@@ -100,9 +111,11 @@ class MLP:
         self._a2 = None # Output probabilities (via softmax)
         
     
-    # forward propagation to get predictions
+    # Forward propagation to get predictions
     def forward(self, x):
         """
+        Forward propagation to get predictions.
+        
         :param x: Batch of flattened MNIST images (shape [batch_size, 784]). (input size 28x28=784)
         
         return self._a2: Prediction probabilities after passing through the two layers.
@@ -117,9 +130,10 @@ class MLP:
         
         return self._a2 # This returned value is 'pred'
     
+    # Backward pass to compute gradients and update weights
     def backward(self, x, y, pred):
         """
-        The function computes gradients averaged over the current batch (e.g., divide gradients by the batch size).
+        Computes gradients averaged over the current batch (e.g., divide gradients by the batch size).
         Uses the chain rule to manually derive gradients for both layers.
         
         :param x: Batch of images
@@ -144,16 +158,16 @@ class MLP:
         dW1 = np.dot(x.T, dz1) / m  # Gradient w.r.t. W1
         db1 = np.sum(dz1, axis=0, keepdims=True) / m  # Gradient w.r.t. b1
         
-        # Update the weights and biases: Gradient descent (θ_new = θ_prev - ⍺*∇f)
+        # Update the weights and biases: Gradient descent (θ_new = θ_prev - ⍺ * ∇f)
         self._W1 = self._W1 - self._lr * dW1
         self._b1 = self._b1 - self._lr * db1
         self._W2 = self._W2 - self._lr * dW2
         self._b2 = self._b2 - self._lr * db2
     
-    # Training step for one batch
+    # Training step for one batch: forward pass, loss calculation, backward pass
     def train(self, x, y):
         """
-        This function uses batch-based training (i.e., process data in batches of size 128 as provided by the dataloader)
+        Uses batch-based training (i.e., process data in batches of size 128 as provided by the dataloader)
         Computes forward function, uses the result(pred: predection) to compute the cross-entropy loss, 
         then computes the backward function.
         
@@ -184,9 +198,8 @@ def main():
     learning_rate = 0.01
     num_epochs = 100
     
-    
-    model = MLP(input_size, hidden_size, output_size, learning_rate) # Initialize model
-
+    # Initialize model
+    model = MLP(input_size, hidden_size, output_size, learning_rate)
 
     # Then, train the model
     for epoch in range(num_epochs):
@@ -212,5 +225,5 @@ def main():
         total_pred += len(labels)
     print(f"Test Accuracy: {correct_pred/total_pred}")
 
-if __name__ == "__main__":  # Program entry
+if __name__ == "__main__":
     main()  
