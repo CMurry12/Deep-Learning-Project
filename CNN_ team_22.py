@@ -1,4 +1,3 @@
-
 import numpy as np
 
 # Class for CNN
