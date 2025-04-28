@@ -195,7 +195,7 @@ def main():
     input_size = 28 * 28 # MNIST images are 28x28 pixels
     hidden_size = 128
     output_size = 10
-    learning_rate = 0.01
+    learning_rate = 0.1
     num_epochs = 100
     
     # Initialize model
